@@ -1,0 +1,64 @@
+```markdown
+# Terraform Local Kind Cluster
+
+Automates a local Kubernetes Kind cluster using Terraform.
+
+## Purpose
+This project demonstrates Infrastructure as Code (IaC) with Terraform to create and manage a local Kubernetes cluster using Kind. It’s ideal for learning Terraform and Kubernetes without cloud dependencies, preparing for AWS-based Cloud Ops roles.
+
+## Prerequisites
+- Terraform >= 1.5.0 ([Download](https://www.terraform.io/downloads.html))
+- Kind ([Install](https://kind.sigs.k8s.io/docs/user/quick-start/#installation))
+- Docker ([Install](https://docs.docker.com/get-docker/))
+
+## Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/subash2021/terraform-local-project.git
+   cd terraform-local-project
+   ```
+2. Initialize Terraform:
+   ```bash
+   terraform init
+   ```
+
+## Usage
+1. Preview changes:
+   ```bash
+   terraform plan
+   ```
+2. Create the cluster:
+   ```bash
+   terraform apply
+   ```
+3. Verify the cluster:
+   ```bash
+   kubectl cluster-info --context kind-dev-cluster
+   ```
+4. Clean up:
+   ```bash
+   terraform destroy
+   ```
+
+## Customization
+- Set a custom cluster name:
+  ```bash
+  terraform apply -var="cluster_name=my-cluster"
+  ```
+
+## Outputs
+- `kind_config_file`: Path to the generated Kind configuration file (e.g., `terraform-generated-dev-cluster-config.yaml`).
+- `kubectl_context`: Kubectl context name (e.g., `kind-dev-cluster`).
+
+## Architecture
+```mermaid
+graph TD
+    A[Terraform] -->|Generates| B[Kind Config YAML]
+    B -->|kind create| C[Kind Cluster]
+    C -->|kubectl| D[Kubernetes API]
+```
+
+## Notes
+- Ensures Kind and Docker are installed before cluster creation.
+- Designed to mirror AWS EKS IaC workflows locally.
+```
