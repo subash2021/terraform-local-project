@@ -1,4 +1,4 @@
-name: Terraform CI
+name: Terraform CI/CD
 on:
   push:
     branches: [ main ]
@@ -7,10 +7,6 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
-    defaults:
-        run:
-            shell: bash
     steps:
     - uses: actions/checkout@v3
     - uses: hashicorp/setup-terraform@v2
@@ -19,3 +15,15 @@ jobs:
     - run: terraform fmt -check
     - run: terraform init
     - run: terraform validate
+    - run: terraform apply -auto-approve
+    - name: Install Kind and Helm
+      run: |
+        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x kind
+        sudo mv kind /usr/local/bin/
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        helm repo add bitnami https://charts.bitnami.com/bitnami
+        helm repo update
+    - name: Deploy NGINX
+      run: |
+        helm install my-nginx bitnami/nginx --set service.type=ClusterIP --namespace default --kube-context kind-dev-cluster
