@@ -1,6 +1,8 @@
 name: Terraform CI
 on:
   push:
+    paths:
+        - 'dev-cluster/**'
     branches: [ main ]
   pull_request:
     branches: [ main ]
