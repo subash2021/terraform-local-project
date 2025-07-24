@@ -59,6 +59,9 @@ graph TD
     C -->|kubectl| D[Kubernetes API]
 ```
 
+## CI/CD
+- GitHub Actions workflow (`terraform.yml`) validates Terraform code on push/pull requests, ensuring formatting and configuration correctness.
+
 ## Notes
 - Customize the cluster name via `-var="cluster_name=my-cluster"`.
 - Requires Kind and Docker to be installed locally.
