@@ -13,31 +13,31 @@ resource "null_resource" "prerequisites_check" {
 }
 
 # kind-cluster-config-generator-resource
-resource "local_file" "kind_config_generator"{
-    
-    filename = "${path.module}/terraform-generated-${var.cluster_name}-config.yaml"
-    content = templatefile("${path.module}/template-kind-config.yaml",{
+resource "local_file" "kind_config_generator" {
+
+  filename = "${path.module}/terraform-generated-${var.cluster_name}-config.yaml"
+  content = templatefile("${path.module}/template-kind-config.yaml", {
     cluster_name = var.cluster_name
-    
-    })
+
+  })
 }
 
 # kind-cluster-generator-resource
 resource "null_resource" "kind_cluster_dev" {
-    depends_on = [local_file.kind_config_generator,null_resource.prerequisites_check]
+  depends_on = [local_file.kind_config_generator, null_resource.prerequisites_check]
 
-    triggers = {
-        cluster_name = var.cluster_name
-    }
+  triggers = {
+    cluster_name = var.cluster_name
+  }
 
-    provisioner "local-exec" {
-        command = "kind create cluster --config ${local_file.kind_config_generator.filename}"
-    }
+  provisioner "local-exec" {
+    command = "kind create cluster --config ${local_file.kind_config_generator.filename}"
+  }
 
-    provisioner "local-exec" {
-        when = destroy
-        command = "kind delete cluster --name ${self.triggers.cluster_name}"
-    }
+  provisioner "local-exec" {
+    when    = destroy
+    command = "kind delete cluster --name ${self.triggers.cluster_name}"
+  }
 }
 /*
 # This resource allows to install ingress-nginx generator-resource
