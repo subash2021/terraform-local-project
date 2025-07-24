@@ -14,16 +14,16 @@ jobs:
       with:
         terraform_version: 1.5.0
     - name: Navigate to dev-cluster and Format Check
-      working-directory: /dev-cluster
+      working-directory: ./dev-cluster
       run: terraform fmt -check
     - name: Navigate to dev-cluster and Initialize
-      working-directory: /dev-cluster
+      working-directory: ./dev-cluster
       run: terraform init
     - name: Navigate to dev-cluster and Validate
-      working-directory: /dev-cluster
+      working-directory: ./dev-cluster
       run: terraform validate
     - name: Navigate to dev-cluster and Apply
-      working-directory: /dev-cluster
+      working-directory: ./dev-cluster
       run: terraform apply -auto-approve
     - name: Install Kind and Helm
       run: |
