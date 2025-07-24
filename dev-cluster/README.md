@@ -1,4 +1,3 @@
-```markdown
 # Terraform Local Kind Cluster
 Automates a local Kubernetes Kind cluster using Terraform.
 
@@ -64,4 +63,3 @@ graph TD
 - Customize the cluster name via `-var="cluster_name=my-cluster"`.
 - Requires Kind and Docker to be installed locally.
 - Designed to mirror AWS EKS IaC workflows locally.
-```
