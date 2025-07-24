@@ -1,6 +1,5 @@
 ```markdown
 # Terraform Local Kind Cluster
-
 Automates a local Kubernetes Kind cluster using Terraform.
 
 ## Purpose
@@ -40,11 +39,14 @@ This project demonstrates Infrastructure as Code (IaC) with Terraform to create 
    terraform destroy
    ```
 
-## Customization
-- Set a custom cluster name:
-  ```bash
-  terraform apply -var="cluster_name=my-cluster"
-  ```
+## Deploying an Application
+1. Install Helm: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`
+2. Add Bitnami repo: `helm repo add bitnami https://charts.bitnami.com/bitnami && helm repo update`
+3. Deploy NGINX:
+   ```bash
+   helm install my-nginx bitnami/nginx --set service.type=ClusterIP --namespace default --kube-context kind-dev-cluster
+   ```
+4. Access NGINX: `kubectl port-forward svc/my-nginx 8080:80 --namespace default --context kind-dev-cluster` and visit `http://localhost:8080`.
 
 ## Outputs
 - `kind_config_file`: Path to the generated Kind configuration file (e.g., `terraform-generated-dev-cluster-config.yaml`).
@@ -59,6 +61,7 @@ graph TD
 ```
 
 ## Notes
-- Ensures Kind and Docker are installed before cluster creation.
+- Customize the cluster name via `-var="cluster_name=my-cluster"`.
+- Requires Kind and Docker to be installed locally.
 - Designed to mirror AWS EKS IaC workflows locally.
 ```
