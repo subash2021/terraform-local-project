@@ -47,6 +47,12 @@ This project demonstrates Infrastructure as Code (IaC) with Terraform to create 
    ```
 4. Access NGINX: `kubectl port-forward svc/my-nginx 8080:80 --namespace default --context kind-dev-cluster` and visit `http://localhost:8080`.
 
+5. Deploy Prometheus for monitoring:
+   ```bash
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   helm repo update
+   helm install prometheus prometheus-community/prometheus --namespace monitoring --create-namespace --kube-context kind-dev-cluster
+
 ## Outputs
 - `kind_config_file`: Path to the generated Kind configuration file (e.g., `terraform-generated-dev-cluster-config.yaml`).
 - `kubectl_context`: Kubectl context name (e.g., `kind-dev-cluster`).
