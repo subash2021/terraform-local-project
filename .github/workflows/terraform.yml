@@ -12,9 +12,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # 1. Setup environment
-    - name: Setup Docker and Kind
+    # 1. Setup all dependencies
+    - name: Setup Environment
       run: |
+        # Install Docker
+        sudo apt-get update
+        sudo apt-get install -y docker.io
         sudo systemctl start docker
         sudo chmod 666 /var/run/docker.sock
         
@@ -28,53 +31,58 @@ jobs:
         chmod +x kubectl
         sudo mv kubectl /usr/local/bin/
 
-    # 2. Terraform operations
+    # 2. Setup Terraform PROPERLY
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false  # Important for direct execution
+
+    # 3. Verify installations
+    - name: Verify Tools
+      run: |
+        docker --version
+        kind version
+        kubectl version --client
+        terraform version
+
+    # 4. Terraform operations
+    - name: Terraform Init
+      working-directory: ./dev-cluster
+      run: |
+        terraform init
+
     - name: Terraform Apply
       working-directory: ./dev-cluster
-      run: terraform apply -auto-approve
+      run: |
+        terraform apply -auto-approve
 
-    # 3. Cluster configuration - CRITICAL FIXES
+    # 5. Cluster configuration
     - name: Configure kubectl access
       id: kubeconfig
+      working-directory: ./dev-cluster
       run: |
         # Wait for cluster
         sleep 30
         
-        # Get absolute path to kubeconfig
+        # Get kubeconfig
         KUBECONFIG_PATH="$HOME/.kube/config"
         mkdir -p $(dirname $KUBECONFIG_PATH)
-        
-        # Generate and verify kubeconfig
         kind get kubeconfig --name dev-cluster > $KUBECONFIG_PATH
         chmod 600 $KUBECONFIG_PATH
         
-        # Verify connectivity
+        # Verify
         kubectl --kubeconfig=$KUBECONFIG_PATH cluster-info
         
-        # Store path for subsequent steps
+        # Store path
         echo "kubeconfig_path=$KUBECONFIG_PATH" >> $GITHUB_OUTPUT
         echo "KUBECONFIG=$KUBECONFIG_PATH" >> $GITHUB_ENV
 
-    # 4. Cluster verification - PROPER CONFIG PROPAGATION
+    # 6. Cluster verification
     - name: Verify Cluster Status
       env:
         KUBECONFIG: ${{ steps.kubeconfig.outputs.kubeconfig_path }}
       run: |
-        # Absolute path to kubeconfig
-        CONFIG="${{ steps.kubeconfig.outputs.kubeconfig_path }}"
-        
-        # Verify context exists
-        kubectl --kubeconfig=$CONFIG config get-contexts
-        
-        # Retry logic with proper config
-        for i in {1..10}; do
-          if kubectl --kubeconfig=$CONFIG get nodes; then
-            break
-          fi
-          echo "Retrying... Attempt $i/10"
-          sleep 10
-        done
-        
-        # Final checks
-        kubectl --kubeconfig=$CONFIG wait --for=condition=Ready nodes --all --timeout=300s
-        kubectl --kubeconfig=$CONFIG get nodes -o wide
+        kubectl config use-context kind-dev-cluster
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+        kubectl get nodes -o wide
