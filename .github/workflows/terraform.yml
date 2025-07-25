@@ -17,9 +17,7 @@ jobs:
       run: |
         docker --version
         sudo systemctl start docker
-        # Ensure docker daemon is properly running
         sudo chmod 666 /var/run/docker.sock
-        docker info
 
     - name: Install Kind and kubectl
       run: |
@@ -28,8 +26,8 @@ jobs:
         chmod +x ./kind
         sudo mv ./kind /usr/local/bin/
         
-        # Install kubectl
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        # Install specific kubectl version
+        curl -LO "https://dl.k8s.io/release/v1.27.3/bin/linux/amd64/kubectl"
         chmod +x kubectl
         sudo mv kubectl /usr/local/bin/
         
@@ -49,28 +47,35 @@ jobs:
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
 
-    # 3. Cluster configuration
+    # 3. Cluster configuration - THE CRITICAL FIX
     - name: Configure kubectl access
       run: |
-        # Wait for cluster to stabilize
-        sleep 45
+        # Wait for cluster
+        sleep 30
         
-        # Get fresh kubeconfig
+        # Get fresh kubeconfig with internal IP
         mkdir -p ~/.kube
-        kind export kubeconfig --name dev-cluster > ~/.kube/config
+        kind get kubeconfig --internal --name dev-cluster > ~/.kube/config
         chmod 600 ~/.kube/config
         
-        # Verify kubectl can connect
-        kubectl cluster-info --context kind-dev-cluster
+        # Force kubectl to use the correct config
+        export KUBECONFIG=~/.kube/config
+        kubectl config use-context kind-dev-cluster
+        
+        # Verify connectivity
+        kubectl config view
         echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
 
     # 4. Cluster verification
     - name: Verify Cluster Status
       run: |
-        # Wait for nodes to be ready
+        # First check
+        kubectl get nodes
+        
+        # Wait with timeout
         kubectl wait --for=condition=Ready nodes --all --timeout=300s
         
-        # Check system components
+        # Final verification
         kubectl get pods -n kube-system
         kubectl get nodes -o wide
 
