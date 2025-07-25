@@ -1,3 +1,4 @@
+
 name: Terraform CI/CD
 on:
   push:
@@ -23,8 +24,9 @@ jobs:
       run: |
         curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
         chmod +x kind
-        [ ! -f ./kind ] && mv kind ./kind || true  # Move only if ./kind doesn't exist
+        [ ! -f ./kind ] && mv kind ./kind || true
         export PATH=$PATH:.
+        ./kind version  # Verify Kind
     - uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: 1.5.0
@@ -40,6 +42,14 @@ jobs:
     - name: Navigate to dev-cluster and Apply
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
+    - name: Set Kubeconfig
+      run: |
+        export KUBECONFIG=$PWD/dev-cluster/terraform-generated-dev-cluster-config.yaml
+        echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
+    - name: Verify Cluster
+      run: |
+        ./kind get clusters | grep dev-cluster || echo "Cluster not found, creating..."
+        [ -z "$(./kind get clusters | grep dev-cluster)" ] && ./kind create cluster --name dev-cluster --config dev-cluster/terraform-generated-dev-cluster-config.yaml
     - name: Install Helm
       run: |
         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
