@@ -8,13 +8,17 @@ on:
 jobs:
   terraform-kind:
     runs-on: ubuntu-latest
+    timeout-minutes: 20  # Increased timeout for cluster operations
     steps:
     - uses: actions/checkout@v3
 
-    # Prerequisite checks
+    # Prerequisite setup
     - name: Verify Docker
-      run: docker --version
-      
+      run: |
+        docker --version
+        sudo systemctl start docker
+        sudo systemctl enable docker
+
     - name: Install Kind
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
@@ -39,21 +43,48 @@ jobs:
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
 
-    # Cluster verification
-    - name: Set KUBECONFIG
+    # Cluster configuration
+    - name: Configure kubectl access
       run: |
-        kind export kubeconfig --name dev-cluster
+        # Wait for cluster to stabilize
+        sleep 30
+        
+        # Export kubeconfig with proper permissions
+        mkdir -p ~/.kube
+        kind export kubeconfig --name dev-cluster --kubeconfig ~/.kube/config
+        chmod 600 ~/.kube/config
         echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
+        
+        # Verify context exists
+        kubectl config get-contexts
 
-    - name: Verify Cluster
+    - name: Verify Cluster Status
       run: |
-        kubectl cluster-info --context kind-dev-cluster
-        kubectl get nodes
+        # Retry logic for cluster verification
+        for i in {1..5}; do
+          if kubectl cluster-info --context kind-dev-cluster; then
+            echo "Cluster verified successfully"
+            kubectl get nodes -o wide
+            exit 0
+          fi
+          echo "Attempt $i/5: Cluster not ready, retrying in 15 seconds..."
+          sleep 15
+        done
+        echo "ERROR: Failed to verify cluster after 5 attempts"
+        exit 1
 
-    # Helm deployment
+    - name: Wait for System Pods
+      run: |
+        kubectl wait --namespace kube-system \
+          --for=condition=ready pod \
+          --selector=tier=control-plane \
+          --timeout=180s
+
+    # Helm setup and deployment
     - name: Install Helm
       run: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        helm version
         helm repo add bitnami https://charts.bitnami.com/bitnami
         helm repo update
 
@@ -63,4 +94,10 @@ jobs:
           --set service.type=ClusterIP \
           --namespace default \
           --kube-context kind-dev-cluster \
-          --wait
+          --wait \
+          --timeout 5m
+
+    - name: Verify Deployment
+      run: |
+        kubectl get pods -n default
+        kubectl get svc -n default
