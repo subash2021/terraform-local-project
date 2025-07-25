@@ -27,7 +27,7 @@ resource "null_resource" "kind_cluster_dev" {
   depends_on = [local_file.kind_config_generator, null_resource.prerequisites_check]
 
   triggers = {
-    always_run = timestamp()
+    always_run   = timestamp()
     cluster_name = var.cluster_name
   }
 
