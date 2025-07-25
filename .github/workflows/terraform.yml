@@ -13,11 +13,13 @@ jobs:
     - uses: actions/checkout@v3
 
     # 1. Setup environment
-    - name: Verify Docker
+    - name: Setup Docker
       run: |
         docker --version
         sudo systemctl start docker
-        
+        # Ensure docker.sock has proper permissions
+        sudo chmod 666 /var/run/docker.sock
+
     - name: Install Kind
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
@@ -38,30 +40,35 @@ jobs:
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
 
-    # 3. Cluster verification with proper kubeconfig handling
+    # 3. Cluster configuration with robust kubeconfig handling
     - name: Configure kubectl access
       run: |
-        # Wait for cluster to be fully ready
-        sleep 30
+        # Wait for cluster components to initialize
+        sleep 45
         
-        # Get kubeconfig directly from Kind
+        # Get fresh kubeconfig with proper endpoints
         mkdir -p ~/.kube
-        kind get kubeconfig --name dev-cluster > ~/.kube/config
+        kind get kubeconfig --internal --name dev-cluster > ~/.kube/config
         chmod 600 ~/.kube/config
         
-        # Verify the context exists
+        # Update kubeconfig to use container's network
+        sed -i 's/server: .*/server: https:\/\/$(docker inspect --format='{{.NetworkSettings.IPAddress}}' dev-cluster-control-plane):6443/' ~/.kube/config
+        
+        # Verify connectivity
+        kubectl config view
         kubectl config get-contexts
         echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
 
-    # 4. Cluster verification with health checks
+    # 4. Cluster verification with proper health checks
     - name: Verify Cluster Status
       run: |
-        # Check nodes
-        kubectl get nodes
-        # Verify control plane is ready
-        kubectl wait --for=condition=Ready node --all --timeout=300s
-        # Check system pods
-        kubectl get pods -n kube-system
+        # Wait for nodes to be ready
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+        
+        # Check system components
+        kubectl get pods -n kube-system -w &
+        sleep 30
+        kubectl get nodes -o wide
 
     # 5. Helm deployment
     - name: Install Helm
@@ -81,5 +88,6 @@ jobs:
 
     - name: Verify Deployment
       run: |
-        kubectl get pods
+        kubectl get pods -w &
+        sleep 15
         kubectl get svc
