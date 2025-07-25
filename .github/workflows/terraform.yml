@@ -48,8 +48,12 @@ jobs:
         echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
     - name: Verify Cluster
       run: |
-        ./kind get clusters | grep dev-cluster || echo "Cluster not found, creating..."
-        [ -z "$(./kind get clusters | grep dev-cluster)" ] && ./kind create cluster --name dev-cluster --config dev-cluster/terraform-generated-dev-cluster-config.yaml
+        if ! ./kind get clusters | grep -q dev-cluster; then
+          echo "Cluster not found, creating..."
+          ./kind create cluster --name dev-cluster --config dev-cluster/terraform-generated-dev-cluster-config.yaml
+        else
+          echo "Cluster dev-cluster already exists"
+        fi
     - name: Install Helm
       run: |
         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
