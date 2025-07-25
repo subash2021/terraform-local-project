@@ -1,4 +1,3 @@
-
 name: Terraform CI/CD
 on:
   push:
@@ -10,6 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Install Docker
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io
+        sudo systemctl start docker
+        sudo systemctl enable docker
+    - name: Install Kind
+      run: |
+        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x kind
+        mv kind ./kind
+        export PATH=$PATH:.
     - uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: 1.5.0
@@ -25,14 +36,14 @@ jobs:
     - name: Navigate to dev-cluster and Apply
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
-    - name: Install Kind and Helm
+    - name: Install Helm
       run: |
-        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-        chmod +x kind
-        sudo mv kind /usr/local/bin/
         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
         helm repo add bitnami https://charts.bitnami.com/bitnami
         helm repo update
+    - name: Uninstall Existing NGINX (if any)
+      run: helm uninstall my-nginx -n default --kube-context kind-dev-cluster || true
+      continue-on-error: true
     - name: Deploy NGINX
       run: |
         helm install my-nginx bitnami/nginx --set service.type=ClusterIP --namespace default --kube-context kind-dev-cluster
