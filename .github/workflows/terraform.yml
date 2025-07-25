@@ -1,4 +1,3 @@
-
 name: Terraform CI/CD
 on:
   push:
@@ -24,7 +23,7 @@ jobs:
       run: |
         curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
         chmod +x kind
-        mv kind ./kind
+        [ ! -f ./kind ] && mv kind ./kind || true  # Move only if ./kind doesn't exist
         export PATH=$PATH:.
     - uses: hashicorp/setup-terraform@v2
       with:
