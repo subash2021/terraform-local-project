@@ -1,67 +1,66 @@
-
-name: Terraform CI/CD
+name: Terraform Kind Cluster CI/CD
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
 jobs:
-  terraform:
+  terraform-kind:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Install Docker
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-        sudo apt-get update
-        sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        sudo systemctl start docker
-        sudo systemctl enable docker
+
+    # Prerequisite checks
+    - name: Verify Docker
+      run: docker --version
+      
     - name: Install Kind
       run: |
-        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-        chmod +x kind
-        [ ! -f ./kind ] && mv kind ./kind || true
-        export PATH=$PATH:.
-        ./kind version  # Verify Kind
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/
+        kind version
+
     - uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: 1.5.0
-    - name: Navigate to dev-cluster and Format Check
-      working-directory: ./dev-cluster
-      run: terraform fmt -check
-    - name: Navigate to dev-cluster and Initialize
+
+    # Terraform operations
+    - name: Terraform Init
       working-directory: ./dev-cluster
       run: terraform init
-    - name: Navigate to dev-cluster and Validate
+
+    - name: Terraform Validate
       working-directory: ./dev-cluster
       run: terraform validate
-    - name: Navigate to dev-cluster and Apply
+
+    - name: Terraform Apply
       working-directory: ./dev-cluster
       run: terraform apply -auto-approve
-    - name: Set Kubeconfig
+
+    # Cluster verification
+    - name: Set KUBECONFIG
       run: |
-        export KUBECONFIG=$PWD/dev-cluster/terraform-generated-dev-cluster-config.yaml
-        echo "KUBECONFIG=$KUBECONFIG" >> $GITHUB_ENV
+        kind export kubeconfig --name dev-cluster
+        echo "KUBECONFIG=~/.kube/config" >> $GITHUB_ENV
+
     - name: Verify Cluster
       run: |
-        if ! ./kind get clusters | grep -q dev-cluster; then
-          echo "Cluster not found, creating..."
-          ./kind create cluster --name dev-cluster --config dev-cluster/terraform-generated-dev-cluster-config.yaml
-        else
-          echo "Cluster dev-cluster already exists"
-        fi
+        kubectl cluster-info --context kind-dev-cluster
+        kubectl get nodes
+
+    # Helm deployment
     - name: Install Helm
       run: |
         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
         helm repo add bitnami https://charts.bitnami.com/bitnami
         helm repo update
-    - name: Uninstall Existing NGINX (if any)
-      run: helm uninstall my-nginx -n default --kube-context kind-dev-cluster || true
-      continue-on-error: true
+
     - name: Deploy NGINX
       run: |
-        helm install my-nginx bitnami/nginx --set service.type=ClusterIP --namespace default --kube-context kind-dev-cluster
+        helm upgrade --install my-nginx bitnami/nginx \
+          --set service.type=ClusterIP \
+          --namespace default \
+          --kube-context kind-dev-cluster \
+          --wait
